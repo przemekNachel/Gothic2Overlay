@@ -2,13 +2,9 @@ from flask import Flask, jsonify, render_template_string
 import pymem
 import threading
 import time
-import json
-import os
 
 PROCESS_NAME   = "Gothic2.exe"
 STATIC_PTR     = 0x8CECBC
-LEVELS_FILE    = "level_thresholds.json"
-
 OFFSETS = {
     "hp_cur":   0x1B8,
     "hp_max":   0x1BC,
@@ -24,33 +20,8 @@ app = Flask(__name__)
 stats_cache = {}
 pm = None
 
-# Dict of level -> exp required to reach that level
-# e.g. {60: 915000} means level 60 starts at 915000 exp
-level_thresholds = {}
-
-def load_thresholds():
-    global level_thresholds
-    if os.path.exists(LEVELS_FILE):
-        with open(LEVELS_FILE) as f:
-            # JSON keys are strings, convert to int
-            level_thresholds = {int(k): v for k, v in json.load(f).items()}
-        print(f"[+] Loaded {len(level_thresholds)} level thresholds from file")
-    else:
-        level_thresholds = {}
-        print("[*] No level thresholds file found, will build as you level up")
-
-def save_thresholds():
-    with open(LEVELS_FILE, "w") as f:
-        json.dump(level_thresholds, f, indent=2)
-
-def get_prev_level_exp(level, next_lvl):
-    """Return the exp at which the current level started."""
-    if level in level_thresholds:
-        return level_thresholds[level]
-    # Fallback: estimate from next level threshold if we have it
-    if (level - 1) in level_thresholds and level in level_thresholds:
-        return level_thresholds[level]
-    return next_lvl - 28000
+def get_prev_level_exp(level):
+    return level * 250 * (level+1)
 
 def connect():
     global pm
@@ -65,42 +36,18 @@ def connect():
 
 def poll_stats():
     global pm
-    last_level = None
-
     while True:
         try:
             obj_base = pm.read_uint(STATIC_PTR)
             if obj_base:
                 s = {name: pm.read_int(obj_base + off) for name, off in OFFSETS.items()}
-
                 cur_level = s["level"]
-
-                # First read — record current level threshold if unknown
-                if last_level is None:
-                    last_level = cur_level
-                    if cur_level not in level_thresholds:
-                        # We don't know when this level started, use estimate
-                        level_thresholds[cur_level] = s["next_lvl"] - 28000
-                        save_thresholds()
-
-                # Level-up detected
-                elif cur_level > last_level:
-                    for lvl in range(last_level + 1, cur_level + 1):
-                        if lvl not in level_thresholds:
-                            # The next_lvl of the previous level = start exp of this level
-                            level_thresholds[lvl] = stats_cache.get("next_lvl", s["next_lvl"] - 28000)
-                            print(f"[+] Level {lvl} threshold saved: {level_thresholds[lvl]:,}")
-                    save_thresholds()
-                    last_level = cur_level
-
-                s["prev_level_exp"] = get_prev_level_exp(cur_level, s["next_lvl"])
+                s["prev_level_exp"] = get_prev_level_exp(cur_level)
                 stats_cache.update(s)
-
         except Exception:
             stats_cache.clear()
             print("[-] Lost connection, reconnecting...")
             connect()
-
         time.sleep(0.5)
 
 HTML = """
@@ -267,7 +214,6 @@ def api_stats():
     return jsonify(stats_cache)
 
 if __name__ == "__main__":
-    load_thresholds()
     connect()
     t = threading.Thread(target=poll_stats, daemon=True)
     t.start()
