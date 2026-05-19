@@ -54,6 +54,7 @@ HTML = """
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="mobile-web-app-capable" content="yes">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gothic 2 HUD</title>
@@ -115,7 +116,7 @@ HTML = """
   </style>
 </head>
 <body>
-  <h1>&#9876; Gothic II</h1>
+  <h1 id="fullscreen-btn">&#9876; Gothic II</h1>
 
   <div class="stat-grid">
     <div class="stat-box">
@@ -163,6 +164,14 @@ HTML = """
   <div id="status">connecting...</div>
 
   <script>
+      const btn = document.getElementById('fullscreen-btn');
+
+      btn.addEventListener('click', () => {
+        // Request full screen on the whole page document
+        document.documentElement.requestFullscreen().catch(err => {
+          console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+        });
+      });
     function fmt(n) { return n.toLocaleString(); }
 
     async function update() {
