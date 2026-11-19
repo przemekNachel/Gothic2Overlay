@@ -2,6 +2,8 @@ from flask import Flask, jsonify, render_template_string
 import pymem
 import threading
 import time
+import qrcode
+import socket
 
 PROCESS_NAME   = "Gothic2.exe"
 STATIC_PTR     = 0x8CECBC
@@ -363,9 +365,25 @@ def api_stats():
         return jsonify({"error": "no data"})
     return jsonify(stats_cache)
 
+def get_lan_ip() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+
+def print_qr(url: str) -> None:
+    qr = qrcode.QRCode(border=2)
+    qr.add_data(url)
+    qr.make(fit=True)
+    qr.print_ascii(invert=True)
+
 if __name__ == "__main__":
     connect()
     t = threading.Thread(target=poll_stats, daemon=True)
     t.start()
-    print("[*] Open http://<your-pc-ip>:5000 on your phone")
-    app.run(host="0.0.0.0", port=5000)
+    port = 5000
+    print("Open on your phone")
+    print_qr(f"http://{get_lan_ip()}:{port}")
+    app.run(host="0.0.0.0", port=port)
