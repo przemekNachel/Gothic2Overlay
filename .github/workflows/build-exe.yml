@@ -1,14 +1,17 @@
-name: Build Windows Executable
+name: Build and Release Gothic2Overlay
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
-  workflow_dispatch: # Allows you to trigger the build manually from the Actions tab
+    branches: [ "main" ]
+    tags:
+      - "*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build-exe:
+  build-and-release:
     runs-on: windows-latest
 
     steps:
@@ -24,15 +27,16 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller
-          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+          pip install -r requirements.txt
 
       - name: Build .exe with PyInstaller
         run: |
-          pyinstaller --onefile --name MyApp Gothic2Overlay main.py
+          pyinstaller --onefile --name Gothic2Overlay main.py
 
-      - name: Upload .exe artifact
-        uses: actions/upload-artifact@v4
+      - name: Publish raw .exe to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: Windows-Executable
-          path: dist/*.exe
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          name: Gothic2Overlay ${{ github.ref_type == 'tag' && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          files: dist/Gothic2Overlay.exe
+          generate_release_notes: true
