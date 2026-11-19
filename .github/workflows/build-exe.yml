@@ -2,7 +2,7 @@ name: Build and Release Gothic2Overlay
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
     tags:
       - "*"
   workflow_dispatch:
